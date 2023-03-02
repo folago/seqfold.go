@@ -65,11 +65,11 @@ func (s Struct) Valid() bool {
 }
 
 func (s Struct) String() string {
-	i, j := " ", " "
+	i, j := "", ""
 	if len(s.IJ) > 0 {
 		i, j = fmt.Sprint(s.IJ[0].I), fmt.Sprint(s.IJ[0].J)
 	}
-	return fmt.Sprintf("(%s, %s) % 6.2f %s", i, j, s.E, s.Desc)
+	return fmt.Sprintf("%4s %4s % 6.2f  %-15s", i, j, s.E, s.Desc)
 }
 
 // MultiString returns all the fields as strings, this is useful to output the

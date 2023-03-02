@@ -117,10 +117,6 @@ func DotBracket(structs []Struct) string {
 // Returns:
 //     (Structs, Structs): The w_cache and the v_cache for traversal later
 func cache(seq string, temp float64) ([][]Struct, [][]Struct) {
-	// if it's a SeqRecord, gather just the seq
-	//    if "SeqRecord" in str(type(seq)):
-	//       seq = str(seq.seq)  # type: ignore
-
 	seq = strings.ToUpper(seq)
 	temp = temp + 273.15 // kelvin
 
@@ -248,7 +244,7 @@ func w(seq string, i, j int, temp float64, v_cache, w_cache [][]Struct, emap Ene
 		}
 	}
 
-	wret := min_struct([]Struct{w1, w2, w3, w4})
+	wret := min_struct(w1, w2, w3, w4)
 	w_cache[i][j] = wret
 	return wret
 }
@@ -381,12 +377,12 @@ func v(seq string, i, j int, temp float64, v_cache, w_cache [][]Struct, emap Ene
 		}
 	}
 
-	e := min_struct([]Struct{e1, e2, e3})
+	e := min_struct(e1, e2, e3)
 	v_cache[i][j] = e
 	return e
 }
 
-func add_branch(s Struct, branches *[]IJ, seq string, i, j int, temp float64, v_cache, w_cache [][]Struct, emap Energies) {
+func add_branch(s Struct, branches *[]IJ, seq string, temp float64, v_cache, w_cache [][]Struct, emap Energies) {
 	if !s.Valid() || len(s.IJ) == 0 {
 		return
 	}
@@ -396,7 +392,7 @@ func add_branch(s Struct, branches *[]IJ, seq string, i, j int, temp float64, v_
 	}
 	for _, ij := range s.IJ {
 		str := w(seq, ij.I, ij.J, temp, v_cache, w_cache, emap)
-		add_branch(str, branches, seq, i, j, temp, v_cache, w_cache, emap)
+		add_branch(str, branches, seq, temp, v_cache, w_cache, emap)
 	}
 }
 
@@ -437,8 +433,8 @@ func multi_branch(seq string, i, k, j int, temp float64, v_cache, w_cache [][]St
 
 	// in python this was a recursive closure, in Go this is not possible so
 	// we pull it out and pass all the parameters
-	add_branch(left, &branches, seq, i, j, temp, v_cache, w_cache, emap)
-	add_branch(right, &branches, seq, i, j, temp, v_cache, w_cache, emap)
+	add_branch(left, &branches, seq, temp, v_cache, w_cache, emap)
+	add_branch(right, &branches, seq, temp, v_cache, w_cache, emap)
 
 	// this isn't multi-branched
 	if len(branches) < 2 {
@@ -621,7 +617,7 @@ func internal_loop(seq string, i, i1, j, j1 int, temp float64, emap Energies) fl
 //    structs: Structures being compared
 // Returns:
 //    struct: The min free energy structure
-func min_struct(structs []Struct) Struct {
+func min_struct(structs ...Struct) Struct {
 	s := STRUCT_NULL
 	for _, str := range structs {
 		if str.E != math.Inf(-1) && str.E < s.E {
@@ -717,6 +713,7 @@ func stack(seq string, i, i1, j, j1 int, temp float64, emap Energies) float64 {
 		if en, ok := emap.DE[pair_de]; ok {
 			d_h, d_s := en.H, en.S
 			dG += d_g(d_h, d_s, temp)
+			return dG
 		}
 	}
 	return 0
@@ -873,11 +870,9 @@ func traceback(i, j int, v_cache, w_cache [][]Struct) []Struct {
 	}
 
 	structs := []Struct{}
-	// ij := IJ{I: i, J: j}
 	for {
 		s = v_cache[i][j]
 
-		// structs = append(structs, Struct{E: s.E, Desc: s.Desc, IJs: []IJ{ij}})
 		structs = append(structs, Struct{E: s.E, Desc: s.Desc, IJ: []IJ{{I: i, J: j}}})
 
 		// it's a hairpin, end of structure
@@ -909,15 +904,7 @@ func traceback(i, j int, v_cache, w_cache [][]Struct) []Struct {
 			}
 		}
 
-		last := structs[len(structs)-1]
-		newlast := Struct{
-			E:    RoundFloat(last.E-e_sum, 1),
-			Desc: last.Desc,
-			IJ:   make([]IJ, len(last.IJ)),
-		}
-		copy(newlast.IJ, last.IJ)
-
-		structs[len(structs)-1] = newlast
+		structs[len(structs)-1].E -= e_sum
 		return append(structs, branches...)
 	}
 
@@ -931,13 +918,8 @@ func traceback(i, j int, v_cache, w_cache [][]Struct) []Struct {
 // Returns:
 //    List[Struct]: Structures in the folded DNA with energy
 func trackback_energy(structs []Struct) []Struct {
-	structs_e := []Struct{}
-	for index, str := range structs {
-		e_next := 0.0
-		if index < len(structs)-1 {
-			e_next = structs[index+1].E
-		}
-		structs_e = append(structs_e, Struct{RoundFloat(str.E-e_next, 1), str.Desc, str.IJ})
+	for i := 0; i < len(structs)-1; i++ {
+		structs[i].E -= structs[i+1].E
 	}
-	return structs_e
+	return structs
 }
