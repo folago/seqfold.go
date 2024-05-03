@@ -28,7 +28,7 @@ optional arguments:
   -r, --sub-structures  write each substructure of the MFE folding to stdout
 ```
 
-## Contibuting 
+## Contributing 
 
 This project has been included in https://github.com/bebop/poly.
 Please contribute to that project.
